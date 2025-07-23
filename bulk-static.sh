@@ -277,11 +277,17 @@ for cfg in /etc/pve/lxc/*.conf; do
   else
     cp -p "$cfg" "${cfg}.bak.static"    # backup
 
-    # Clean existing gw= entries, then inject correct gateway
-    sed -i -E '/^net0:/{
-      s/,gw=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+//g
-      s#(ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+)#\1,gw='"$GATEWAY"'#
-    }' "$cfg"
+    # Clean existing gw= entries, then inject correct IP and gateway
+    netmask_escaped="${NETMASK//\//\\\/}"
+    new_ip="${tagip}${netmask_escaped}"
+    
+    # Remove existing gateway settings and update IP
+    sed -i 's/,gw=[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+//g' "$cfg"
+    sed -i "s/ip=dhcp/ip=${new_ip}/" "$cfg"
+    sed -i "s/ip=[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\/[0-9]\+/ip=${new_ip}/" "$cfg"
+    
+    # Add gateway to the IP configuration
+    sed -i "s/\(ip=[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+\/[0-9]\+\)/\1,gw=${GATEWAY}/" "$cfg"
 
     if [[ "$container_was_running" == "true" ]]; then
       echo "   • Stopping & starting LXC #$vmid"
